@@ -47,8 +47,8 @@ public class ReversePaymentCommand implements PaymentCommand {
                     .findById(payment.getLoanId())
                     .orElseThrow(() -> new IllegalStateException("Loan not found"));
 
-            if (installment.getLoanId() != payment.getLoanId()) {
-                throw new IllegalStateException("Payment installment does not belong to payment loan");
+            if (installment == null) {
+                throw new IllegalStateException("Installment not found");
             }
 
             BigDecimal paymentAmount = payment.getAmountDecimal();

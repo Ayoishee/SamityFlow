@@ -1,4 +1,3 @@
-
 package com.samityflow.service;
 
 import com.samityflow.database.Database;
@@ -11,12 +10,12 @@ public class WeeklyCollectionService {
 
     private final Database database;
 
-    public WeeklyCollectionService(){
+    public WeeklyCollectionService() {
         this(Database.applicationDatabase());
     }
 
-    public WeeklyCollectionService(Database database){
-        this.database=database;
+    public WeeklyCollectionService(Database database) {
+        this.database = database;
     }
 
     public CollectionResult collectPayment(
@@ -25,101 +24,125 @@ public class WeeklyCollectionService {
             int memberId,
             BigDecimal paymentAmount,
             BigDecimal savingsAmount,
-            LocalDate date){
+            LocalDate date) {
 
-        if(paymentAmount==null ||
-           paymentAmount.compareTo(BigDecimal.ZERO)<=0)
+        if (paymentAmount == null ||
+                paymentAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return new CollectionResult(false,
-                "Payment amount must be positive");
+                    "Payment amount must be positive");
+        }
 
-        try(Connection c=database.connect()){
+        try (Connection c = database.connect()) {
 
             c.setAutoCommit(false);
 
-            try{
+            try {
                 InstallmentRepository installments =
-                    new InstallmentRepository(c);
+                        new InstallmentRepository(c);
 
                 PaymentRepository payments =
-                    new PaymentRepository(c);
+                        new PaymentRepository(c);
 
                 LoanRepository loans =
-                    new LoanRepository(c);
+                        new LoanRepository(c);
 
                 SavingsTransactionRepository savings =
-                    new SavingsTransactionRepository(c);
+                        new SavingsTransactionRepository(c);
 
                 AuditLogRepository audit =
-                    new AuditLogRepository(c);
+                        new AuditLogRepository(c);
 
-                var item=installments.findById(installmentId);
+                var item = installments.findById(installmentId);
 
-                if(item.isEmpty())
+                if (item.isEmpty()) {
                     throw new RuntimeException("Installment not found");
+                }
 
-                var current=item.get();
+                var current = item.get();
 
-                BigDecimal outstanding =
-                    current.getTotalAmount()
-                    .subtract(current.getPaidAmount());
+                BigDecimal outstandingInstallment =
+                        current.getTotalAmount()
+                                .subtract(current.getPaidAmount());
 
-                if(paymentAmount.compareTo(outstanding)>0)
+                if (paymentAmount.compareTo(outstandingInstallment) > 0) {
                     throw new RuntimeException(
-                      "Payment exceeds outstanding amount");
+                            "Payment exceeds outstanding amount");
+                }
 
-                BigDecimal paid =
-                    current.getPaidAmount()
-                    .add(paymentAmount);
+                BigDecimal newPaid =
+                        current.getPaidAmount()
+                                .add(paymentAmount);
 
                 String status =
-                    paid.compareTo(current.getTotalAmount())>=0
-                    ? "PAID"
-                    : "PARTIALLY_PAID";
+                        newPaid.compareTo(current.getTotalAmount()) >= 0
+                                ? "PAID"
+                                : "PARTIALLY_PAID";
 
                 payments.save(
-                    installmentId,
-                    loanId,
-                    memberId,
-                    paymentAmount.doubleValue(),
-                    "WEEKLY_COLLECTION");
+                        installmentId,
+                        loanId,
+                        memberId,
+                        paymentAmount.doubleValue(),
+                        "WEEKLY_COLLECTION"
+                );
 
                 installments.updatePayment(
-                    installmentId, paid, status);
+                        installmentId,
+                        newPaid,
+                        status
+                );
+
+                // FIX: decrease existing loan outstanding balance
+                var loan = loans.findById(loanId)
+                        .orElseThrow(() ->
+                                new RuntimeException("Loan not found"));
+
+                BigDecimal newLoanOutstanding =
+                        loan.getOutstandingDecimal()
+                                .subtract(paymentAmount);
+
+                if (newLoanOutstanding.compareTo(BigDecimal.ZERO) < 0) {
+                    newLoanOutstanding = BigDecimal.ZERO;
+                }
 
                 loans.updateOutstandingBalance(
-                    loanId,
-                    Math.max(0, paymentAmount.negate()
-                    .doubleValue()));
+                        loanId,
+                        newLoanOutstanding
+                );
 
-                if(savingsAmount!=null &&
-                   savingsAmount.compareTo(BigDecimal.ZERO)>0){
+                if (savingsAmount != null &&
+                        savingsAmount.compareTo(BigDecimal.ZERO) > 0) {
 
                     savings.save(
-                       memberId,
-                       "DEPOSIT",
-                       savingsAmount.doubleValue(),
-                       "WEEKLY_COLLECTION");
+                            memberId,
+                            "DEPOSIT",
+                            savingsAmount.doubleValue(),
+                            "WEEKLY_COLLECTION"
+                    );
                 }
 
                 audit.save(
-                    "PAYMENT_COLLECTION",
-                    "INSTALLMENT",
-                    installmentId,
-                    "SYSTEM",
-                    "Weekly collection posted");
+                        "PAYMENT_COLLECTION",
+                        "INSTALLMENT",
+                        installmentId,
+                        "SYSTEM",
+                        "Weekly collection posted"
+                );
 
                 c.commit();
 
                 return new CollectionResult(
-                    true,"Collection successful");
+                        true,
+                        "Collection successful"
+                );
 
-            }catch(Exception e){
+            } catch (Exception e) {
                 c.rollback();
-                return new CollectionResult(
-                    false,e.getMessage());
+                return new CollectionResult(false, e.getMessage());
             }
-        }catch(Exception e){
-            return new CollectionResult(false,e.getMessage());
+
+        } catch (Exception e) {
+            return new CollectionResult(false, e.getMessage());
         }
     }
 }
