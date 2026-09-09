@@ -1,11 +1,13 @@
 package com.samityflow.model;
 
+import java.math.BigDecimal;
+
 public class Payment {
     private int id;
     private int loanId;
     private int installmentId;
     private int memberId;
-    private double amount;
+    private BigDecimal amount = BigDecimal.ZERO;
     private String reference;
     private String status;
     private Integer reversalOfPaymentId;
@@ -17,7 +19,7 @@ public class Payment {
     public Payment(int id, int loanId, double amount, String reference) {
         this.id = id;
         this.loanId = loanId;
-        this.amount = amount;
+        this.amount = BigDecimal.valueOf(amount);
         this.reference = reference;
     }
 
@@ -35,7 +37,7 @@ public class Payment {
         this.loanId = loanId;
         this.installmentId = installmentId;
         this.memberId = memberId;
-        this.amount = amount;
+        this.amount = BigDecimal.valueOf(amount);
         this.reference = reference;
         this.status = status;
         this.reversalOfPaymentId = reversalOfPaymentId;
@@ -73,12 +75,23 @@ public class Payment {
         this.memberId = memberId;
     }
 
+    /**
+     * Backward-compatible numeric accessor used by existing callers.
+     */
     public double getAmount() {
+        return amount.doubleValue();
+    }
+
+    public BigDecimal getAmountDecimal() {
         return amount;
     }
 
     public void setAmount(double amount) {
-        this.amount = amount;
+        this.amount = BigDecimal.valueOf(amount);
+    }
+
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount == null ? BigDecimal.ZERO : amount;
     }
 
     public String getReference() {

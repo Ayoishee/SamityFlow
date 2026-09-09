@@ -47,7 +47,11 @@ public class ReversePaymentCommand implements PaymentCommand {
                     .findById(payment.getLoanId())
                     .orElseThrow(() -> new IllegalStateException("Loan not found"));
 
-            BigDecimal paymentAmount = BigDecimal.valueOf(payment.getAmount());
+            if (installment.getLoanId() != payment.getLoanId()) {
+                throw new IllegalStateException("Payment installment does not belong to payment loan");
+            }
+
+            BigDecimal paymentAmount = payment.getAmountDecimal();
             BigDecimal currentPaid = installment.getPaidAmount();
             BigDecimal restoredPaid = currentPaid.subtract(paymentAmount);
 
@@ -57,21 +61,19 @@ public class ReversePaymentCommand implements PaymentCommand {
                 );
             }
 
-            BigDecimal currentOutstanding = BigDecimal.valueOf(loan.getOutstanding());
+            BigDecimal currentOutstanding = loan.getOutstandingDecimal();
             if (currentOutstanding.compareTo(BigDecimal.ZERO) < 0) {
                 throw new IllegalStateException("Loan outstanding balance is invalid");
             }
 
             BigDecimal restoredOutstanding = currentOutstanding.add(paymentAmount);
-            if (restoredOutstanding.compareTo(BigDecimal.ZERO) < 0) {
-                throw new IllegalStateException("Restored loan outstanding balance is invalid");
-            }
-
             String restoredStatus = installmentStatusAfterReversal(
                     installment,
                     restoredPaid
             );
 
+            // All mutations are performed on the same transaction-owned connection.
+            // The service commits only after the audit entry succeeds.
             reversalPaymentId = payments.saveReversal(payment);
             payments.updateStatus(payment.getId(), "REVERSED");
             installments.updatePayment(
@@ -81,19 +83,19 @@ public class ReversePaymentCommand implements PaymentCommand {
             );
             loans.updateOutstandingBalance(
                     payment.getLoanId(),
-                    restoredOutstanding.doubleValue()
+                    restoredOutstanding
             );
 
             audit.save(
-                    "PAYMENT_REVERSAL",
+                    "PAYMENT_REVERSED",
                     "PAYMENT",
                     payment.getId(),
                     "SYSTEM",
-                    "Original payment " + payment.getId()
-                            + " reversed by payment " + reversalPaymentId
+                    "originalPaymentId=" + payment.getId()
+                            + "; reversalPaymentId=" + reversalPaymentId
+                            + "; loanId=" + payment.getLoanId()
+                            + "; installmentId=" + payment.getInstallmentId()
                             + "; amount=" + paymentAmount.toPlainString()
-                            + "; installment=" + payment.getInstallmentId()
-                            + "; loan=" + payment.getLoanId()
             );
         } catch (RuntimeException exception) {
             throw exception;
@@ -104,7 +106,7 @@ public class ReversePaymentCommand implements PaymentCommand {
 
     @Override
     public void undo() {
-        // Reversal records are financial history and are not deleted by undo.
+        // Financial reversals are immutable history; transaction rollback is handled by the service.
     }
 
     public int getReversalPaymentId() {
@@ -116,7 +118,7 @@ public class ReversePaymentCommand implements PaymentCommand {
             throw new IllegalArgumentException("Payment is required");
         }
 
-        if (payment.getAmount() <= 0) {
+        if (payment.getAmountDecimal().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("Original payment amount must be greater than zero");
         }
 
@@ -150,10 +152,6 @@ public class ReversePaymentCommand implements PaymentCommand {
 
         if (restoredPaid.compareTo(BigDecimal.ZERO) > 0) {
             return "PARTIALLY_PAID";
-        }
-
-        if ("OVERDUE".equalsIgnoreCase(installment.getStatus())) {
-            return "OVERDUE";
         }
 
         LocalDate dueDate = installment.getDueDate();

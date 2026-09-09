@@ -2,6 +2,7 @@ package com.samityflow.repository;
 
 import com.samityflow.model.Payment;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -19,11 +20,31 @@ public class PaymentRepository {
 
     public void save(int installmentId, int loanId, int memberId,
                      double amount, String reference) throws SQLException {
+        save(installmentId, loanId, memberId, BigDecimal.valueOf(amount), reference);
+    }
+
+    public void save(int installmentId, int loanId, int memberId,
+                     BigDecimal amount, String reference) throws SQLException {
         saveAndReturnId(installmentId, loanId, memberId, amount, reference);
     }
 
     public int saveAndReturnId(int installmentId, int loanId, int memberId,
                                double amount, String reference) throws SQLException {
+        return saveAndReturnId(
+                installmentId,
+                loanId,
+                memberId,
+                BigDecimal.valueOf(amount),
+                reference
+        );
+    }
+
+    public int saveAndReturnId(int installmentId, int loanId, int memberId,
+                               BigDecimal amount, String reference) throws SQLException {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
+
         String sql = """
                 INSERT INTO payments(
                     installment_id,
@@ -42,7 +63,7 @@ public class PaymentRepository {
             ps.setInt(1, installmentId);
             ps.setInt(2, loanId);
             ps.setInt(3, memberId);
-            ps.setDouble(4, amount);
+            ps.setBigDecimal(4, amount);
             ps.setString(5, reference);
             ps.executeUpdate();
         }
@@ -123,7 +144,7 @@ public class PaymentRepository {
             ps.setInt(1, originalPayment.getInstallmentId());
             ps.setInt(2, originalPayment.getLoanId());
             ps.setInt(3, originalPayment.getMemberId());
-            ps.setDouble(4, -originalPayment.getAmount());
+            ps.setBigDecimal(4, originalPayment.getAmountDecimal().negate());
             ps.setString(5, "REVERSAL-" + originalPayment.getId());
             ps.setInt(6, originalPayment.getId());
             ps.executeUpdate();
@@ -163,7 +184,7 @@ public class PaymentRepository {
         payment.setInstallmentId(rs.getInt("installment_id"));
         payment.setLoanId(rs.getInt("loan_id"));
         payment.setMemberId(rs.getInt("member_id"));
-        payment.setAmount(rs.getDouble("amount"));
+        payment.setAmount(rs.getBigDecimal("amount"));
         payment.setReference(rs.getString("payment_reference"));
         payment.setStatus(rs.getString("status"));
 
