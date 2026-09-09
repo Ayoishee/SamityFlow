@@ -38,7 +38,9 @@ public class LoanRepository {
         ps.executeUpdate();
     }
 
+
     public Optional<Loan> findById(int id) throws SQLException {
+
         PreparedStatement ps = connection.prepareStatement(
                 "SELECT * FROM loans WHERE loan_id=?"
         );
@@ -48,11 +50,49 @@ public class LoanRepository {
         ResultSet rs = ps.executeQuery();
 
         if (rs.next()) {
-            return Optional.empty(); // map with existing Loan constructor
+            return Optional.of(mapLoan(rs));
         }
 
         return Optional.empty();
     }
+
+
+    public Loan findByApplicationId(int applicationId)
+            throws SQLException {
+
+        PreparedStatement ps = connection.prepareStatement(
+                "SELECT * FROM loans WHERE application_id=?"
+        );
+
+        ps.setInt(1, applicationId);
+
+        ResultSet rs = ps.executeQuery();
+
+        if (rs.next()) {
+            return mapLoan(rs);
+        }
+
+        return null;
+    }
+
+
+    public void updateStatus(int loanId, String status)
+            throws SQLException {
+
+        PreparedStatement ps = connection.prepareStatement(
+                """
+                UPDATE loans
+                SET status=?
+                WHERE loan_id=?
+                """
+        );
+
+        ps.setString(1, status);
+        ps.setInt(2, loanId);
+
+        ps.executeUpdate();
+    }
+
 
     public void updateOutstandingBalance(int loanId, double amount)
             throws SQLException {
@@ -69,5 +109,19 @@ public class LoanRepository {
         ps.setInt(2, loanId);
 
         ps.executeUpdate();
+    }
+
+
+    private Loan mapLoan(ResultSet rs) throws SQLException {
+
+        Loan loan = new Loan();
+
+        loan.setId(rs.getInt("loan_id"));
+        loan.setApplicationId(rs.getInt("application_id"));
+        loan.setMemberId(rs.getInt("member_id"));
+        loan.setAmount(rs.getDouble("principal"));
+        loan.setOutstanding(rs.getDouble("outstanding_balance"));
+
+        return loan;
     }
 }
