@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -25,20 +26,26 @@ class PaymentReversalServiceTest {
     @TempDir
     Path tempDirectory;
 
+    private Path databasePath;
     private Database database;
     private PaymentReversalService service;
 
     @BeforeEach
     void setUp() {
-        database = new Database("jdbc:sqlite:" + tempDirectory.resolve("reversal-test.db"));
+        databasePath = tempDirectory.resolve("reversal-test.db");
+        database = new Database("jdbc:sqlite:" + databasePath);
         database.initialize();
         database.seed();
         service = new PaymentReversalService(database);
     }
 
     @Test
-    void successfulReversalPreservesOriginalAndCreatesLinkedReversal() throws Exception {
-        Fixture fixture = fixture(400, 1_000, 1_000, 5_000, LocalDate.now().plusDays(7), "PAID");
+    void successfulPartialPaymentReversalPreservesOriginalAndCreatesLinkedHistoryRecord()
+            throws Exception {
+        Fixture fixture = fixture(
+                400, 1_000, 1_000, 5_000,
+                LocalDate.now().plusDays(7), "PAID"
+        );
 
         service.reversePayment(fixture.paymentId());
 
@@ -48,57 +55,80 @@ class PaymentReversalServiceTest {
             Payment reversal = payments.findReversalByOriginalPayment(fixture.paymentId()).orElseThrow();
 
             assertEquals(fixture.paymentId(), original.getId());
+            assertEquals(400.0, original.getAmount(), 0.001);
+            assertEquals("PAY-FIXTURE", original.getReference());
             assertEquals("REVERSED", original.getStatus());
+
             assertEquals("REVERSAL", reversal.getStatus());
             assertEquals(-400.0, reversal.getAmount(), 0.001);
             assertEquals(Integer.valueOf(fixture.paymentId()), reversal.getReversalOfPaymentId());
+            assertEquals(fixture.installmentId(), reversal.getInstallmentId());
+            assertEquals(fixture.loanId(), reversal.getLoanId());
             assertNotNull(reversal.getReference());
+
             assertEquals(2, count(connection, "SELECT COUNT(*) FROM payments"));
+            assertEquals(1, count(connection,
+                    "SELECT COUNT(*) FROM payments WHERE reversal_of_payment_id=" + fixture.paymentId()));
         }
     }
 
     @Test
-    void reversalRestoresOnlyTheOriginalPaymentAmountFromInstallment() throws Exception {
-        Fixture fixture = fixture(400, 1_000, 1_000, 5_000, LocalDate.now().plusDays(7), "PAID");
+    void successfulFullPaymentReversalReturnsFutureInstallmentToPending() throws Exception {
+        Fixture fixture = fixture(
+                1_000, 1_000, 1_000, 4_000,
+                LocalDate.now().plusDays(7), "PAID"
+        );
 
         service.reversePayment(fixture.paymentId());
 
         try (Connection connection = database.connect()) {
-            assertEquals(600.0, scalarDouble(connection,
+            assertMoney("0", scalarDecimal(connection,
                     "SELECT paid_amount FROM installments WHERE installment_id=?",
-                    fixture.installmentId()), 0.001);
-            assertEquals("PARTIALLY_PAID", scalarString(connection,
-                    "SELECT status FROM installments WHERE installment_id=?",
                     fixture.installmentId()));
-        }
-    }
-
-    @Test
-    void fullRestorationReturnsFutureInstallmentToPending() throws Exception {
-        Fixture fixture = fixture(500, 1_000, 500, 5_000, LocalDate.now().plusDays(7), "PARTIALLY_PAID");
-
-        service.reversePayment(fixture.paymentId());
-
-        try (Connection connection = database.connect()) {
-            assertEquals(0.0, scalarDouble(connection,
-                    "SELECT paid_amount FROM installments WHERE installment_id=?",
-                    fixture.installmentId()), 0.001);
             assertEquals("PENDING", scalarString(connection,
                     "SELECT status FROM installments WHERE installment_id=?",
                     fixture.installmentId()));
+            assertMoney("5000", scalarDecimal(connection,
+                    "SELECT outstanding_balance FROM loans WHERE loan_id=?",
+                    fixture.loanId()));
         }
     }
 
     @Test
-    void fullRestorationPreservesOverdueBehaviorForPastDueInstallment() throws Exception {
-        Fixture fixture = fixture(500, 1_000, 500, 5_000, LocalDate.now().minusDays(1), "OVERDUE");
+    void reversalSubtractsOnlyOriginalPaymentAndChangesPaidToPartiallyPaid() throws Exception {
+        Fixture fixture = fixture(
+                400, 1_000, 1_000, 5_000,
+                LocalDate.now().plusDays(7), "PAID"
+        );
 
         service.reversePayment(fixture.paymentId());
 
         try (Connection connection = database.connect()) {
-            assertEquals(0.0, scalarDouble(connection,
+            assertMoney("600", scalarDecimal(connection,
                     "SELECT paid_amount FROM installments WHERE installment_id=?",
-                    fixture.installmentId()), 0.001);
+                    fixture.installmentId()));
+            assertEquals("PARTIALLY_PAID", scalarString(connection,
+                    "SELECT status FROM installments WHERE installment_id=?",
+                    fixture.installmentId()));
+            assertMoney("5400", scalarDecimal(connection,
+                    "SELECT outstanding_balance FROM loans WHERE loan_id=?",
+                    fixture.loanId()));
+        }
+    }
+
+    @Test
+    void zeroPaidPastDueInstallmentBecomesOverdueEvenWhenItWasPreviouslyPaid() throws Exception {
+        Fixture fixture = fixture(
+                500, 1_000, 500, 5_000,
+                LocalDate.now().minusDays(1), "PAID"
+        );
+
+        service.reversePayment(fixture.paymentId());
+
+        try (Connection connection = database.connect()) {
+            assertMoney("0", scalarDecimal(connection,
+                    "SELECT paid_amount FROM installments WHERE installment_id=?",
+                    fixture.installmentId()));
             assertEquals("OVERDUE", scalarString(connection,
                     "SELECT status FROM installments WHERE installment_id=?",
                     fixture.installmentId()));
@@ -106,64 +136,83 @@ class PaymentReversalServiceTest {
     }
 
     @Test
-    void reversalRestoresLoanOutstandingByExactPaymentAmount() throws Exception {
-        Fixture fixture = fixture(500, 1_000, 500, 5_000, LocalDate.now().plusDays(7), "PARTIALLY_PAID");
-
-        service.reversePayment(fixture.paymentId());
-
-        try (Connection connection = database.connect()) {
-            assertEquals(5_500.0, scalarDouble(connection,
-                    "SELECT outstanding_balance FROM loans WHERE loan_id=?",
-                    fixture.loanId()), 0.001);
-        }
-    }
-
-    @Test
-    void successfulReversalCreatesExactlyOneAuditEntry() throws Exception {
-        Fixture fixture = fixture(400, 1_000, 1_000, 5_000, LocalDate.now().plusDays(7), "PAID");
+    void successfulReversalCreatesOneDetailedAuditEntry() throws Exception {
+        Fixture fixture = fixture(
+                400, 1_000, 1_000, 5_000,
+                LocalDate.now().plusDays(7), "PAID"
+        );
 
         service.reversePayment(fixture.paymentId());
 
         try (Connection connection = database.connect()) {
             assertEquals(1, count(connection,
-                    "SELECT COUNT(*) FROM audit_logs WHERE action='PAYMENT_REVERSAL'"));
+                    "SELECT COUNT(*) FROM audit_logs WHERE action='PAYMENT_REVERSED'"));
+
             String details = scalarString(connection,
-                    "SELECT details FROM audit_logs WHERE action='PAYMENT_REVERSAL'");
-            assertTrue(details.contains("Original payment " + fixture.paymentId()));
-            assertTrue(details.contains("amount=400.0"));
+                    "SELECT details FROM audit_logs WHERE action='PAYMENT_REVERSED'");
+            assertTrue(details.contains("originalPaymentId=" + fixture.paymentId()));
+            assertTrue(details.contains("reversalPaymentId="));
+            assertTrue(details.contains("loanId=" + fixture.loanId()));
+            assertTrue(details.contains("installmentId=" + fixture.installmentId()));
+            assertTrue(details.contains("amount=400"));
         }
     }
 
     @Test
-    void secondReversalIsRejectedWithoutSecondBalanceAdjustment() throws Exception {
-        Fixture fixture = fixture(400, 1_000, 1_000, 5_000, LocalDate.now().plusDays(7), "PAID");
+    void secondReversalIsRejectedAndChangesNothing() throws Exception {
+        Fixture fixture = fixture(
+                400, 1_000, 1_000, 5_000,
+                LocalDate.now().plusDays(7), "PAID"
+        );
 
         service.reversePayment(fixture.paymentId());
-        assertThrows(IllegalStateException.class, () -> service.reversePayment(fixture.paymentId()));
 
-        try (Connection connection = database.connect()) {
-            assertEquals(1, count(connection,
-                    "SELECT COUNT(*) FROM payments WHERE reversal_of_payment_id=" + fixture.paymentId()));
-            assertEquals(600.0, scalarDouble(connection,
-                    "SELECT paid_amount FROM installments WHERE installment_id=?",
-                    fixture.installmentId()), 0.001);
-            assertEquals(5_400.0, scalarDouble(connection,
-                    "SELECT outstanding_balance FROM loans WHERE loan_id=?",
-                    fixture.loanId()), 0.001);
-            assertEquals(1, count(connection,
-                    "SELECT COUNT(*) FROM audit_logs WHERE action='PAYMENT_REVERSAL'"));
-        }
+        State afterFirst = readState(fixture);
+        assertThrows(IllegalStateException.class, () -> service.reversePayment(fixture.paymentId()));
+        State afterSecond = readState(fixture);
+
+        assertEquals(afterFirst, afterSecond);
+        assertEquals(1, afterSecond.reversalCount());
+        assertEquals(1, afterSecond.auditCount());
+        assertEquals("REVERSED", afterSecond.originalStatus());
+        assertMoney("600", afterSecond.installmentPaid());
+        assertMoney("5400", afterSecond.loanOutstanding());
     }
 
     @Test
-    void lateAuditFailureRollsBackEveryReversalChange() throws Exception {
-        Fixture fixture = fixture(400, 1_000, 1_000, 5_000, LocalDate.now().plusDays(7), "PAID");
+    void negativeRestoredPaidAmountIsRejectedWithoutAnyPersistedChange() throws Exception {
+        Fixture fixture = fixture(
+                600, 1_000, 500, 5_000,
+                LocalDate.now().plusDays(7), "PARTIALLY_PAID"
+        );
+
+        State before = readState(fixture);
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> service.reversePayment(fixture.paymentId())
+        );
+        State after = readState(fixture);
+
+        assertTrue(exception.getMessage().contains("negative"));
+        assertEquals(before, after);
+        assertEquals(0, after.reversalCount());
+        assertEquals(0, after.auditCount());
+        assertEquals("COMPLETED", after.originalStatus());
+    }
+
+    @Test
+    void lateAuditFailureRollsBackOriginalReversalInstallmentLoanAndAudit() throws Exception {
+        Fixture fixture = fixture(
+                400, 1_000, 1_000, 5_000,
+                LocalDate.now().plusDays(7), "PAID"
+        );
+        State before = readState(fixture);
 
         try (Connection connection = database.connect(); Statement statement = connection.createStatement()) {
             statement.execute("""
                     CREATE TRIGGER fail_payment_reversal_audit
                     BEFORE INSERT ON audit_logs
-                    WHEN NEW.action='PAYMENT_REVERSAL'
+                    WHEN NEW.action='PAYMENT_REVERSED'
                     BEGIN
                         SELECT RAISE(ABORT, 'forced audit failure');
                     END
@@ -171,29 +220,126 @@ class PaymentReversalServiceTest {
         }
 
         assertThrows(RuntimeException.class, () -> service.reversePayment(fixture.paymentId()));
+        State after = readState(fixture);
 
-        try (Connection connection = database.connect()) {
-            assertEquals("COMPLETED", scalarString(connection,
-                    "SELECT status FROM payments WHERE payment_id=?",
-                    fixture.paymentId()));
-            assertEquals(0, count(connection,
+        assertEquals(before, after);
+        assertEquals("COMPLETED", after.originalStatus());
+        assertEquals(0, after.reversalCount());
+        assertEquals(0, after.auditCount());
+    }
+
+    @Test
+    void reversalAndDuplicateProtectionSurviveDatabaseReload() throws Exception {
+        Fixture fixture = fixture(
+                400, 1_000, 1_000, 5_000,
+                LocalDate.now().plusDays(7), "PAID"
+        );
+
+        service.reversePayment(fixture.paymentId());
+
+        Database reloadedDatabase = new Database("jdbc:sqlite:" + databasePath);
+        reloadedDatabase.initialize();
+        PaymentReversalService reloadedService = new PaymentReversalService(reloadedDatabase);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> reloadedService.reversePayment(fixture.paymentId())
+        );
+
+        try (Connection connection = reloadedDatabase.connect()) {
+            assertEquals(1, count(connection,
                     "SELECT COUNT(*) FROM payments WHERE reversal_of_payment_id=" + fixture.paymentId()));
-            assertEquals(1_000.0, scalarDouble(connection,
+            assertEquals("REVERSED", scalarString(connection,
+                    "SELECT status FROM payments WHERE payment_id=?", fixture.paymentId()));
+            assertEquals(1, count(connection,
+                    "SELECT COUNT(*) FROM audit_logs WHERE action='PAYMENT_REVERSED'"));
+        }
+    }
+
+    @Test
+    void collectionThenReversalRestoresExactPreCollectionFinancialState() throws Exception {
+        BaseFixture base = fixtureWithoutPayment(
+                1_000, 600, 5_000,
+                LocalDate.now().plusDays(7), "PARTIALLY_PAID"
+        );
+
+        WeeklyCollectionService collectionService = new WeeklyCollectionService(database);
+        CollectionResult result = collectionService.collectPayment(
+                base.installmentId(),
+                base.loanId(),
+                1,
+                new BigDecimal("400"),
+                BigDecimal.ZERO,
+                LocalDate.now()
+        );
+
+        assertTrue(result.isSuccess(), result.getMessage());
+
+        int paymentId;
+        try (Connection connection = database.connect()) {
+            paymentId = scalarInt(connection,
+                    "SELECT payment_id FROM payments WHERE installment_id=? AND status='COMPLETED'",
+                    base.installmentId());
+            assertMoney("1000", scalarDecimal(connection,
                     "SELECT paid_amount FROM installments WHERE installment_id=?",
-                    fixture.installmentId()), 0.001);
+                    base.installmentId()));
             assertEquals("PAID", scalarString(connection,
                     "SELECT status FROM installments WHERE installment_id=?",
-                    fixture.installmentId()));
-            assertEquals(5_000.0, scalarDouble(connection,
+                    base.installmentId()));
+            assertMoney("4600", scalarDecimal(connection,
                     "SELECT outstanding_balance FROM loans WHERE loan_id=?",
-                    fixture.loanId()), 0.001);
-            assertEquals(0, count(connection,
-                    "SELECT COUNT(*) FROM audit_logs WHERE action='PAYMENT_REVERSAL'"));
+                    base.loanId()));
+        }
+
+        service.reversePayment(paymentId);
+
+        try (Connection connection = database.connect()) {
+            assertMoney("600", scalarDecimal(connection,
+                    "SELECT paid_amount FROM installments WHERE installment_id=?",
+                    base.installmentId()));
+            assertEquals("PARTIALLY_PAID", scalarString(connection,
+                    "SELECT status FROM installments WHERE installment_id=?",
+                    base.installmentId()));
+            assertMoney("5000", scalarDecimal(connection,
+                    "SELECT outstanding_balance FROM loans WHERE loan_id=?",
+                    base.loanId()));
+            assertEquals("REVERSED", scalarString(connection,
+                    "SELECT status FROM payments WHERE payment_id=?", paymentId));
+            assertEquals(1, count(connection,
+                    "SELECT COUNT(*) FROM payments WHERE reversal_of_payment_id=" + paymentId));
         }
     }
 
     private Fixture fixture(
             double paymentAmount,
+            double installmentTotal,
+            double installmentPaid,
+            double loanOutstanding,
+            LocalDate dueDate,
+            String installmentStatus
+    ) throws SQLException {
+        BaseFixture base = fixtureWithoutPayment(
+                installmentTotal,
+                installmentPaid,
+                loanOutstanding,
+                dueDate,
+                installmentStatus
+        );
+
+        try (Connection connection = database.connect()) {
+            PaymentRepository payments = new PaymentRepository(connection);
+            int paymentId = payments.saveAndReturnId(
+                    base.installmentId(),
+                    base.loanId(),
+                    1,
+                    BigDecimal.valueOf(paymentAmount),
+                    "PAY-FIXTURE"
+            );
+            return new Fixture(paymentId, base.installmentId(), base.loanId());
+        }
+    }
+
+    private BaseFixture fixtureWithoutPayment(
             double installmentTotal,
             double installmentPaid,
             double loanOutstanding,
@@ -218,7 +364,7 @@ class PaymentReversalServiceTest {
                         ) VALUES(?,1,10000,?,'ACTIVE')
                         """)) {
                     ps.setInt(1, applicationId);
-                    ps.setDouble(2, loanOutstanding);
+                    ps.setBigDecimal(2, BigDecimal.valueOf(loanOutstanding));
                     ps.executeUpdate();
                     loanId = lastInsertId(connection);
                 }
@@ -233,24 +379,15 @@ class PaymentReversalServiceTest {
                         """)) {
                     ps.setInt(1, loanId);
                     ps.setString(2, dueDate.toString());
-                    ps.setDouble(3, installmentTotal);
-                    ps.setDouble(4, installmentPaid);
+                    ps.setBigDecimal(3, BigDecimal.valueOf(installmentTotal));
+                    ps.setBigDecimal(4, BigDecimal.valueOf(installmentPaid));
                     ps.setString(5, installmentStatus);
                     ps.executeUpdate();
                     installmentId = lastInsertId(connection);
                 }
 
-                PaymentRepository payments = new PaymentRepository(connection);
-                int paymentId = payments.saveAndReturnId(
-                        installmentId,
-                        loanId,
-                        1,
-                        paymentAmount,
-                        "PAY-FIXTURE"
-                );
-
                 connection.commit();
-                return new Fixture(paymentId, installmentId, loanId);
+                return new BaseFixture(installmentId, loanId);
             } catch (Exception exception) {
                 connection.rollback();
                 if (exception instanceof SQLException sqlException) {
@@ -258,6 +395,28 @@ class PaymentReversalServiceTest {
                 }
                 throw new SQLException("Could not create payment reversal fixture", exception);
             }
+        }
+    }
+
+    private State readState(Fixture fixture) throws SQLException {
+        try (Connection connection = database.connect()) {
+            return new State(
+                    scalarString(connection,
+                            "SELECT status FROM payments WHERE payment_id=?", fixture.paymentId()),
+                    count(connection,
+                            "SELECT COUNT(*) FROM payments WHERE reversal_of_payment_id=" + fixture.paymentId()),
+                    scalarDecimal(connection,
+                            "SELECT paid_amount FROM installments WHERE installment_id=?",
+                            fixture.installmentId()),
+                    scalarString(connection,
+                            "SELECT status FROM installments WHERE installment_id=?",
+                            fixture.installmentId()),
+                    scalarDecimal(connection,
+                            "SELECT outstanding_balance FROM loans WHERE loan_id=?",
+                            fixture.loanId()),
+                    count(connection,
+                            "SELECT COUNT(*) FROM audit_logs WHERE action='PAYMENT_REVERSED'")
+            );
         }
     }
 
@@ -286,13 +445,24 @@ class PaymentReversalServiceTest {
         }
     }
 
-    private double scalarDouble(Connection connection, String sql, Object... values)
+    private int scalarInt(Connection connection, String sql, Object... values)
             throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             bind(ps, values);
             try (ResultSet rs = ps.executeQuery()) {
                 rs.next();
-                return rs.getDouble(1);
+                return rs.getInt(1);
+            }
+        }
+    }
+
+    private BigDecimal scalarDecimal(Connection connection, String sql, Object... values)
+            throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            bind(ps, values);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getBigDecimal(1);
             }
         }
     }
@@ -314,6 +484,23 @@ class PaymentReversalServiceTest {
         }
     }
 
+    private void assertMoney(String expected, BigDecimal actual) {
+        assertEquals(0, new BigDecimal(expected).compareTo(actual));
+    }
+
     private record Fixture(int paymentId, int installmentId, int loanId) {
+    }
+
+    private record BaseFixture(int installmentId, int loanId) {
+    }
+
+    private record State(
+            String originalStatus,
+            int reversalCount,
+            BigDecimal installmentPaid,
+            String installmentStatus,
+            BigDecimal loanOutstanding,
+            int auditCount
+    ) {
     }
 }

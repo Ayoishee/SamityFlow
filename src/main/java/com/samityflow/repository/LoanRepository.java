@@ -2,6 +2,7 @@ package com.samityflow.repository;
 
 import com.samityflow.model.Loan;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -35,8 +36,8 @@ public class LoanRepository {
         )) {
             ps.setInt(1, loan.getApplicationId());
             ps.setInt(2, loan.getMemberId());
-            ps.setDouble(3, loan.getAmount());
-            ps.setDouble(4, loan.getOutstanding());
+            ps.setBigDecimal(3, loan.getAmountDecimal());
+            ps.setBigDecimal(4, loan.getOutstandingDecimal());
             ps.setString(5, "PENDING");
             ps.executeUpdate();
         }
@@ -56,9 +57,9 @@ public class LoanRepository {
                         rs.getInt("loan_id"),
                         rs.getInt("application_id"),
                         rs.getInt("member_id"),
-                        rs.getDouble("principal")
+                        rs.getBigDecimal("principal").doubleValue()
                 );
-                loan.setOutstanding(rs.getDouble("outstanding_balance"));
+                loan.setOutstanding(rs.getBigDecimal("outstanding_balance"));
                 return Optional.of(loan);
             }
         }
@@ -66,12 +67,21 @@ public class LoanRepository {
 
     public void updateOutstandingBalance(int loanId, double amount)
             throws SQLException {
+        updateOutstandingBalance(loanId, BigDecimal.valueOf(amount));
+    }
+
+    public void updateOutstandingBalance(int loanId, BigDecimal amount)
+            throws SQLException {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Loan outstanding balance cannot be negative");
+        }
+
         try (PreparedStatement ps = connection.prepareStatement("""
                 UPDATE loans
                 SET outstanding_balance=?
                 WHERE loan_id=?
                 """)) {
-            ps.setDouble(1, amount);
+            ps.setBigDecimal(1, amount);
             ps.setInt(2, loanId);
 
             if (ps.executeUpdate() != 1) {

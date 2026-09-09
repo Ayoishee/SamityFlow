@@ -59,13 +59,28 @@ public class Installment {
     }
 
 
+    public void setId(int id) {
+        this.id = id;
+    }
+
+
     public int getLoanId() {
         return loanId;
     }
 
 
+    public void setLoanId(int loanId) {
+        this.loanId = loanId;
+    }
+
+
     public int getNumber() {
         return number;
+    }
+
+
+    public void setNumber(int number) {
+        this.number = number;
     }
 
 

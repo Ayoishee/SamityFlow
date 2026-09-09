@@ -32,8 +32,6 @@ public class PaymentReversalService {
                         .findById(paymentId)
                         .orElseThrow(() -> new IllegalStateException("Payment not found"));
 
-                validateOriginalPayment(originalPayment, payments);
-
                 ReversePaymentCommand command = new ReversePaymentCommand(
                         originalPayment,
                         payments,
@@ -50,32 +48,11 @@ public class PaymentReversalService {
                     throw runtimeException;
                 }
                 throw new RuntimeException("Payment reversal failed", exception);
-            } finally {
-                connection.setAutoCommit(true);
             }
         } catch (RuntimeException exception) {
             throw exception;
         } catch (Exception exception) {
             throw new RuntimeException("Payment reversal failed", exception);
-        }
-    }
-
-    private void validateOriginalPayment(
-            Payment payment,
-            PaymentRepository payments
-    ) throws Exception {
-        if (payment.getReversalOfPaymentId() != null
-                || "REVERSAL".equalsIgnoreCase(payment.getStatus())) {
-            throw new IllegalStateException("A reversal payment cannot be reversed");
-        }
-
-        if ("REVERSED".equalsIgnoreCase(payment.getStatus())
-                || payments.findReversalByOriginalPayment(payment.getId()).isPresent()) {
-            throw new IllegalStateException("Payment already reversed");
-        }
-
-        if (!"COMPLETED".equalsIgnoreCase(payment.getStatus())) {
-            throw new IllegalStateException("Only completed original payments can be reversed");
         }
     }
 }
