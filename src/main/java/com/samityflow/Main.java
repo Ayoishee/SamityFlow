@@ -26,7 +26,7 @@ public class Main extends Application {
             dashboard.refresh(); management.refresh(); loans.refresh(); products.refresh();
         });
 
-        stage.setTitle("SamityFlow - Asshifa Sultana MVP");
+        stage.setTitle("SamityFlow");
         stage.setScene(new Scene(tabs, 1100, 700));
         stage.show();
     }
