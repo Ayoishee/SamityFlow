@@ -43,6 +43,25 @@ public class LoanRepository {
         }
     }
 
+    public Optional<Loan> findByApplicationId(int applicationId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT loan_id FROM loans WHERE application_id=?")) {
+            ps.setInt(1, applicationId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? findById(rs.getInt(1)) : Optional.empty();
+            }
+        }
+    }
+
+    public void updateStatus(int loanId, String status) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE loans SET status=? WHERE loan_id=?")) {
+            ps.setString(1, status);
+            ps.setInt(2, loanId);
+            ps.executeUpdate();
+        }
+    }
+
     public Optional<Loan> findById(int id) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement(
                 "SELECT * FROM loans WHERE loan_id=?")) {

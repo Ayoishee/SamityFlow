@@ -9,23 +9,25 @@ import java.util.Optional;
 
 public class LoanProductRepository {
     private final Database database;
-    public LoanProductRepository(Database database) { this.database = database; }
+    private final Connection connection;
+    public LoanProductRepository(Database database) { this.database = database; this.connection = null; }
+    public LoanProductRepository(Connection connection) { this.database = null; this.connection = connection; }
 
     public LoanProduct save(LoanProduct p) {
         String sql = "INSERT INTO loan_products(name,interest_strategy,interest_rate,penalty_strategy,penalty_rate,duration_weeks,required_guarantees,weekly_savings) VALUES(?,?,?,?,?,?,?,?)";
-        try (Connection c=database.connect(); PreparedStatement s=c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection c=(connection != null ? connection : database.connect()); PreparedStatement s=c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             set(s,p); s.executeUpdate(); try(ResultSet keys=s.getGeneratedKeys()){return new LoanProduct(keys.getInt(1),p.name(),p.interestStrategy(),p.interestRate(),p.penaltyStrategy(),p.penaltyRate(),p.durationWeeks(),p.requiredGuarantees(),p.weeklySavings());}
         } catch(SQLException e){throw new RuntimeException("Could not save product",e);}
     }
 
     public List<LoanProduct> findAll() {
         List<LoanProduct> items=new ArrayList<>();
-        try(Connection c=database.connect(); Statement s=c.createStatement(); ResultSet r=s.executeQuery("SELECT * FROM loan_products ORDER BY name")){while(r.next())items.add(map(r));return items;}
+        try(Connection c=(connection != null ? connection : database.connect()); Statement s=c.createStatement(); ResultSet r=s.executeQuery("SELECT * FROM loan_products ORDER BY name")){while(r.next())items.add(map(r));return items;}
         catch(SQLException e){throw new RuntimeException("Could not load products",e);}
     }
 
     public Optional<LoanProduct> findById(int id) {
-        try(Connection c=database.connect(); PreparedStatement s=c.prepareStatement("SELECT * FROM loan_products WHERE id=?")){s.setInt(1,id);try(ResultSet r=s.executeQuery()){return r.next()?Optional.of(map(r)):Optional.empty();}}
+        try(Connection c=(connection != null ? connection : database.connect()); PreparedStatement s=c.prepareStatement("SELECT * FROM loan_products WHERE id=?")){s.setInt(1,id);try(ResultSet r=s.executeQuery()){return r.next()?Optional.of(map(r)):Optional.empty();}}
         catch(SQLException e){throw new RuntimeException("Could not load product",e);}
     }
 
