@@ -1,0 +1,81 @@
+package com.samityflow.service;
+
+import com.samityflow.database.Database;
+import com.samityflow.model.Payment;
+import com.samityflow.pattern.command.ReversePaymentCommand;
+import com.samityflow.repository.AuditLogRepository;
+import com.samityflow.repository.InstallmentRepository;
+import com.samityflow.repository.LoanRepository;
+import com.samityflow.repository.PaymentRepository;
+
+import java.sql.Connection;
+
+public class PaymentReversalService {
+
+    private final Database database;
+
+    public PaymentReversalService() {
+        this(Database.applicationDatabase());
+    }
+
+    public PaymentReversalService(Database database) {
+        this.database = database;
+    }
+
+    public void reversePayment(int paymentId) {
+        try (Connection connection = database.connect()) {
+            connection.setAutoCommit(false);
+
+            try {
+                PaymentRepository payments = new PaymentRepository(connection);
+                Payment originalPayment = payments
+                        .findById(paymentId)
+                        .orElseThrow(() -> new IllegalStateException("Payment not found"));
+
+                validateOriginalPayment(originalPayment, payments);
+
+                ReversePaymentCommand command = new ReversePaymentCommand(
+                        originalPayment,
+                        payments,
+                        new InstallmentRepository(connection),
+                        new LoanRepository(connection),
+                        new AuditLogRepository(connection)
+                );
+
+                command.execute();
+                connection.commit();
+            } catch (Exception exception) {
+                connection.rollback();
+                if (exception instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                }
+                throw new RuntimeException("Payment reversal failed", exception);
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (RuntimeException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new RuntimeException("Payment reversal failed", exception);
+        }
+    }
+
+    private void validateOriginalPayment(
+            Payment payment,
+            PaymentRepository payments
+    ) throws Exception {
+        if (payment.getReversalOfPaymentId() != null
+                || "REVERSAL".equalsIgnoreCase(payment.getStatus())) {
+            throw new IllegalStateException("A reversal payment cannot be reversed");
+        }
+
+        if ("REVERSED".equalsIgnoreCase(payment.getStatus())
+                || payments.findReversalByOriginalPayment(payment.getId()).isPresent()) {
+            throw new IllegalStateException("Payment already reversed");
+        }
+
+        if (!"COMPLETED".equalsIgnoreCase(payment.getStatus())) {
+            throw new IllegalStateException("Only completed original payments can be reversed");
+        }
+    }
+}
