@@ -1,7 +1,12 @@
 package com.samityflow.repository;
 
 import com.samityflow.model.Loan;
-import java.sql.*;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Optional;
 
 public class LoanRepository {
@@ -14,60 +19,64 @@ public class LoanRepository {
 
     public void save(Loan loan) throws SQLException {
         String sql = """
-            INSERT INTO loans(
-                application_id,
-                member_id,
-                principal,
-                outstanding_balance,
-                status
-            )
-            VALUES(?,?,?,?,?)
-        """;
+                INSERT INTO loans(
+                    application_id,
+                    member_id,
+                    principal,
+                    outstanding_balance,
+                    status
+                )
+                VALUES(?,?,?,?,?)
+                """;
 
-        PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = connection.prepareStatement(
                 sql,
                 Statement.RETURN_GENERATED_KEYS
-        );
-
-        ps.setInt(1, loan.getApplicationId());
-        ps.setInt(2, loan.getMemberId());
-        ps.setDouble(3, loan.getAmount());
-        ps.setDouble(4, loan.getOutstanding());
-        ps.setString(5, "PENDING");
-
-        ps.executeUpdate();
+        )) {
+            ps.setInt(1, loan.getApplicationId());
+            ps.setInt(2, loan.getMemberId());
+            ps.setDouble(3, loan.getAmount());
+            ps.setDouble(4, loan.getOutstanding());
+            ps.setString(5, "PENDING");
+            ps.executeUpdate();
+        }
     }
 
     public Optional<Loan> findById(int id) throws SQLException {
-        PreparedStatement ps = connection.prepareStatement(
-                "SELECT * FROM loans WHERE loan_id=?"
-        );
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT * FROM loans WHERE loan_id=?")) {
+            ps.setInt(1, id);
 
-        ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return Optional.empty();
+                }
 
-        ResultSet rs = ps.executeQuery();
-
-        if (rs.next()) {
-            return Optional.empty(); // map with existing Loan constructor
+                Loan loan = new Loan(
+                        rs.getInt("loan_id"),
+                        rs.getInt("application_id"),
+                        rs.getInt("member_id"),
+                        rs.getDouble("principal")
+                );
+                loan.setOutstanding(rs.getDouble("outstanding_balance"));
+                return Optional.of(loan);
+            }
         }
-
-        return Optional.empty();
     }
 
     public void updateOutstandingBalance(int loanId, double amount)
             throws SQLException {
-
-        PreparedStatement ps = connection.prepareStatement(
-                """
+        try (PreparedStatement ps = connection.prepareStatement("""
                 UPDATE loans
                 SET outstanding_balance=?
                 WHERE loan_id=?
-                """
-        );
+                """)) {
+            ps.setDouble(1, amount);
+            ps.setInt(2, loanId);
 
-        ps.setDouble(1, amount);
-        ps.setInt(2, loanId);
-
-        ps.executeUpdate();
+            if (ps.executeUpdate() != 1) {
+                throw new SQLException("Loan balance update affected an unexpected number of rows");
+            }
+        }
     }
 }
