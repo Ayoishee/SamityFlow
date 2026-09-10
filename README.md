@@ -105,8 +105,7 @@ These patterns address concrete workflow and maintainability problems. The final
 | **Chain of Responsibility** | Loan approval pipeline (group -> officer -> manager) | Each approver can pass or halt the request without hardcoding the complete approval hierarchy |
 | **Factory Method** | Installment schedule generation | Each loan product can create a structurally different repayment-schedule shape |
 | **Observer** | Overdue, default, and low-savings alerts | One event can notify several independent listeners without coupling those listeners together |
-| **Command** *(secondary)* | Payment collection at weekly meetings | Wraps each payment as an auditable action that can be safely corrected through a reversal command when a field-entry mistake occurs |
-| **Decorator** *(secondary)* | Optional loan add-ons such as insurance, fees, and group-fund contributions | Add-ons can be combined freely for each loan without creating a separate subclass for every possible combination |
+| **Command**  | Payment collection at weekly meetings | Wraps each payment as an auditable action that can be safely corrected through a reversal command when a field-entry mistake occurs |
 
 ---
 
