@@ -79,9 +79,30 @@ public class LoanRepository {
                         rs.getBigDecimal("principal").doubleValue()
                 );
                 loan.setOutstanding(rs.getBigDecimal("outstanding_balance"));
+                loan.setStatus(rs.getString("status"));
                 return Optional.of(loan);
             }
         }
+    }
+
+    public java.util.List<Loan> findAllActive() throws SQLException {
+        java.util.List<Loan> result = new java.util.ArrayList<>();
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT * FROM loans WHERE status IN ('ACTIVE','DEFAULTED') ORDER BY loan_id DESC");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Loan loan = new Loan(
+                        rs.getInt("loan_id"),
+                        rs.getInt("application_id"),
+                        rs.getInt("member_id"),
+                        rs.getBigDecimal("principal").doubleValue()
+                );
+                loan.setOutstanding(rs.getBigDecimal("outstanding_balance"));
+                loan.setStatus(rs.getString("status"));
+                result.add(loan);
+            }
+        }
+        return result;
     }
 
     public void updateOutstandingBalance(int loanId, double amount)

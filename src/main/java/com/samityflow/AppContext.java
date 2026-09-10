@@ -4,6 +4,12 @@ import com.samityflow.database.Database;
 import com.samityflow.repository.*;
 import com.samityflow.service.LoanApplicationService;
 import com.samityflow.service.LoanCalculationService;
+import com.samityflow.service.LoanDisbursementService;
+import com.samityflow.service.OverdueService;
+import com.samityflow.service.PaymentReversalService;
+import com.samityflow.service.ReportService;
+import com.samityflow.service.SavingsService;
+import com.samityflow.service.WeeklyCollectionService;
 
 public class AppContext {
     public final Database database;
@@ -16,6 +22,12 @@ public class AppContext {
     public final GuaranteeRepository guarantees;
     public final LoanApplicationService loanService;
     public final LoanCalculationService calculationService = new LoanCalculationService();
+    public final LoanDisbursementService disbursementService;
+    public final WeeklyCollectionService collectionService;
+    public final PaymentReversalService reversalService;
+    public final SavingsService savingsService;
+    public final OverdueService overdueService;
+    public final ReportService reportService;
 
     public AppContext(Database database) {
         this.database = database;
@@ -29,5 +41,11 @@ public class AppContext {
         applications = new LoanApplicationRepository(database);
         guarantees = new GuaranteeRepository(database);
         loanService = new LoanApplicationService(applications, members, products, guarantees);
+        disbursementService = new LoanDisbursementService(database);
+        collectionService = new WeeklyCollectionService(database);
+        reversalService = new PaymentReversalService(database);
+        savingsService = new SavingsService(database);
+        overdueService = new OverdueService(database);
+        reportService = new ReportService(database);
     }
 }

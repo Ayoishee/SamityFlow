@@ -16,14 +16,22 @@ public class Main extends Application {
         ManagementController management = new ManagementController(context);
         LoanController loans = new LoanController(context);
         ProductController products = new ProductController(context);
+        ServicingController servicing = new ServicingController(context);
+        SavingsController savings = new SavingsController(context);
+        ReportsController reports = new ReportsController(context);
 
         Tab dashboardTab = tab("Dashboard", dashboard.view());
         Tab managementTab = tab("Samities & Members", management.view());
         Tab loanTab = tab("Applications & Approval", loans.view());
         Tab productTab = tab("Loan Products", products.view());
-        TabPane tabs = new TabPane(dashboardTab, managementTab, loanTab, productTab);
+        Tab servicingTab = tab("Collection", servicing.view());
+        Tab savingsTab = tab("Savings", savings.view());
+        Tab reportsTab = tab("Reports", reports.view());
+        TabPane tabs = new TabPane(dashboardTab, managementTab, loanTab, productTab,
+                servicingTab, savingsTab, reportsTab);
         tabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
             dashboard.refresh(); management.refresh(); loans.refresh(); products.refresh();
+            servicing.refresh(); savings.refresh(); reports.refresh();
         });
 
         stage.setTitle("SamityFlow");
@@ -39,4 +47,3 @@ public class Main extends Application {
 
     public static void main(String[] args) { launch(args); }
 }
-//mvn javafx:run

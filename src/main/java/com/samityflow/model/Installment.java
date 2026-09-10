@@ -152,4 +152,11 @@ public class Installment {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    @Override
+    public String toString() {
+        return "Installment #" + number + " - due " + dueDate
+                + " - " + paidAmount.toPlainString() + "/" + totalAmount.toPlainString()
+                + " - " + status;
+    }
 }

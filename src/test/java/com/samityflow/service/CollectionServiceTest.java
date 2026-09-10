@@ -20,6 +20,8 @@ class CollectionServiceTest {
 
         assertFalse(service.collect(0, "COL-001"));
         assertFalse(service.collect(-100, "COL-002"));
+        assertFalse(service.collect(100, ""));
+        assertFalse(service.collect(100, null));
     }
 
     @Test

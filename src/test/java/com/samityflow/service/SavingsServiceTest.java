@@ -27,5 +27,6 @@ class SavingsServiceTest {
         SavingsService service = new SavingsService();
 
         assertFalse(service.validateWithdrawal(1_000, -1));
+        assertFalse(service.validateWithdrawal(1_000, 0));
     }
 }

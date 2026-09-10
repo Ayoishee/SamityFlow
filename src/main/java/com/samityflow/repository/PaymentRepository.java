@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.util.Optional;
 
 public class PaymentRepository {
@@ -41,8 +42,21 @@ public class PaymentRepository {
 
     public int saveAndReturnId(int installmentId, int loanId, int memberId,
                                BigDecimal amount, String reference) throws SQLException {
+        return saveAndReturnId(installmentId, loanId, memberId, amount, reference,
+                LocalDate.now());
+    }
+
+    public int saveAndReturnId(int installmentId, int loanId, int memberId,
+                               BigDecimal amount, String reference, LocalDate paymentDate)
+            throws SQLException {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
+        if (reference == null || reference.isBlank()) {
+            throw new IllegalArgumentException("Payment reference is required");
+        }
+        if (paymentDate == null) {
+            throw new IllegalArgumentException("Payment date is required");
         }
 
         String sql = """
@@ -56,7 +70,7 @@ public class PaymentRepository {
                     status,
                     reversal_of_payment_id
                 )
-                VALUES(?,?,?,?,?,CURRENT_TIMESTAMP,'COMPLETED',NULL)
+                VALUES(?,?,?,?,?,?,'COMPLETED',NULL)
                 """;
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
@@ -65,10 +79,33 @@ public class PaymentRepository {
             ps.setInt(3, memberId);
             ps.setBigDecimal(4, amount);
             ps.setString(5, reference);
+            ps.setString(6, paymentDate.toString());
             ps.executeUpdate();
         }
 
         return lastInsertId();
+    }
+
+    public boolean referenceExists(String reference) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT COUNT(*) FROM payments WHERE payment_reference=?")) {
+            ps.setString(1, reference);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+    }
+
+    public java.util.List<Payment> findRecent() throws SQLException {
+        java.util.List<Payment> result = new java.util.ArrayList<>();
+        try (PreparedStatement ps = connection.prepareStatement("""
+                SELECT payment_id, installment_id, loan_id, member_id, amount,
+                       payment_reference, status, reversal_of_payment_id
+                FROM payments ORDER BY payment_id DESC LIMIT 50
+                """); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) result.add(mapPayment(rs));
+        }
+        return result;
     }
 
     public Optional<Payment> findById(int id) throws SQLException {

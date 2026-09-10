@@ -38,14 +38,6 @@
         </dependency>
 
 
-        <!-- JavaFX FXML support -->
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-fxml</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
-
-
         <!-- SQLite Database -->
         <dependency>
             <groupId>org.xerial</groupId>
@@ -68,18 +60,6 @@
 
 
     <build>
-
-        <extensions>
-
-            <!-- Detect OS for JavaFX native libraries -->
-            <extension>
-                <groupId>kr.motd.maven</groupId>
-                <artifactId>os-maven-plugin</artifactId>
-                <version>1.7.1</version>
-            </extension>
-
-        </extensions>
-
 
         <plugins>
 

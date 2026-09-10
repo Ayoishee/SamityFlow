@@ -8,6 +8,7 @@ public class Loan {
     private int memberId;
     private BigDecimal amount = BigDecimal.ZERO;
     private BigDecimal outstanding = BigDecimal.ZERO;
+    private String status = "PENDING";
 
     public Loan() {
     }
@@ -60,5 +61,18 @@ public class Loan {
 
     public void setOutstanding(BigDecimal value) {
         outstanding = value == null ? BigDecimal.ZERO : value;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    @Override
+    public String toString() {
+        return "Loan #" + id + " - outstanding " + outstanding.toPlainString() + " - " + status;
     }
 }

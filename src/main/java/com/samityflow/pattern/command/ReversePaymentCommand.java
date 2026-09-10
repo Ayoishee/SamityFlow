@@ -85,6 +85,7 @@ public class ReversePaymentCommand implements PaymentCommand {
                     payment.getLoanId(),
                     restoredOutstanding
             );
+            loans.updateStatus(payment.getLoanId(), "ACTIVE");
 
             audit.save(
                     "PAYMENT_REVERSED",
@@ -141,7 +142,8 @@ public class ReversePaymentCommand implements PaymentCommand {
             Installment installment,
             BigDecimal restoredPaid
     ) {
-        BigDecimal required = installment.getTotalAmount();
+        BigDecimal required = installment.getTotalAmount()
+                .add(installment.getPenaltyAmount());
         if (required == null || required.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("Installment total amount is invalid");
         }

@@ -7,6 +7,7 @@ import com.samityflow.repository.AuditLogRepository;
 import com.samityflow.repository.InstallmentRepository;
 import com.samityflow.repository.LoanRepository;
 import com.samityflow.repository.PaymentRepository;
+import com.samityflow.repository.SavingsTransactionRepository;
 
 import java.sql.Connection;
 
@@ -41,6 +42,8 @@ public class PaymentReversalService {
                 );
 
                 command.execute();
+                new SavingsTransactionRepository(connection)
+                        .reverseDeposit(originalPayment.getReference(), paymentId);
                 connection.commit();
             } catch (Exception exception) {
                 connection.rollback();

@@ -46,8 +46,23 @@ public class Database {
                 statement.execute(sql);
             }
             ensurePaymentReversalColumn(connection);
+            makeExistingReferencesUnique(connection, "payments", "payment_id", "payment_reference");
+            makeExistingReferencesUnique(connection, "savings_transactions", "transaction_id", "transaction_reference");
+            statement.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_payments_reference ON payments(payment_reference)");
+            statement.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_savings_reference ON savings_transactions(transaction_reference)");
         } catch (SQLException exception) {
             throw new RuntimeException("Could not initialize database", exception);
+        }
+    }
+
+    private void makeExistingReferencesUnique(Connection connection, String table,
+                                              String idColumn, String referenceColumn)
+            throws SQLException {
+        String sql = "UPDATE " + table + " SET " + referenceColumn + "=" + referenceColumn
+                + " || '-' || " + idColumn + " WHERE " + idColumn + " NOT IN "
+                + "(SELECT MIN(" + idColumn + ") FROM " + table + " GROUP BY " + referenceColumn + ")";
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate(sql);
         }
     }
 

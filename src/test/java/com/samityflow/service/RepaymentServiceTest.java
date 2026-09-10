@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RepaymentServiceTest {
 
@@ -26,5 +27,14 @@ class RepaymentServiceTest {
         double total = schedule.stream().mapToDouble(Double::doubleValue).sum();
 
         assertEquals(1_000, total, 0.001);
+    }
+
+    @Test
+    void rejectsInvalidAmountAndDuration() {
+        RepaymentService service = new RepaymentService();
+        assertThrows(IllegalArgumentException.class,
+                () -> service.generateWeeklySchedule(1_000, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.generateWeeklySchedule(0, 10));
     }
 }

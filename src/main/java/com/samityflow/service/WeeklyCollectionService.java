@@ -5,6 +5,7 @@ import com.samityflow.repository.*;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.time.LocalDate;
+import java.util.UUID;
 
 public class WeeklyCollectionService {
 
@@ -26,10 +27,32 @@ public class WeeklyCollectionService {
             BigDecimal savingsAmount,
             LocalDate date) {
 
+        return collectPayment(installmentId, loanId, memberId, paymentAmount,
+                savingsAmount, date, "COL-" + UUID.randomUUID());
+    }
+
+    public CollectionResult collectPayment(
+            int installmentId,
+            int loanId,
+            int memberId,
+            BigDecimal paymentAmount,
+            BigDecimal savingsAmount,
+            LocalDate date,
+            String reference) {
+
         if (paymentAmount == null ||
                 paymentAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return new CollectionResult(false,
                     "Payment amount must be positive");
+        }
+        if (savingsAmount != null && savingsAmount.compareTo(BigDecimal.ZERO) < 0) {
+            return new CollectionResult(false, "Savings amount cannot be negative");
+        }
+        if (reference == null || reference.isBlank()) {
+            return new CollectionResult(false, "Collection reference is required");
+        }
+        if (date == null) {
+            return new CollectionResult(false, "Collection date is required");
         }
 
         try (Connection c = database.connect()) {
@@ -60,8 +83,25 @@ public class WeeklyCollectionService {
 
                 var current = item.get();
 
+                if (current.getLoanId() != loanId) {
+                    throw new RuntimeException("Installment does not belong to this loan");
+                }
+
+                var loan = loans.findById(loanId)
+                        .orElseThrow(() -> new RuntimeException("Loan not found"));
+                if (loan.getMemberId() != memberId) {
+                    throw new RuntimeException("Loan does not belong to this member");
+                }
+                if (!"ACTIVE".equals(loan.getStatus()) && !"DEFAULTED".equals(loan.getStatus())) {
+                    throw new RuntimeException("Only an active loan can receive payments");
+                }
+                if (payments.referenceExists(reference)) {
+                    throw new RuntimeException("Collection reference already used");
+                }
+
                 BigDecimal outstandingInstallment =
                         current.getTotalAmount()
+                                .add(current.getPenaltyAmount())
                                 .subtract(current.getPaidAmount());
 
                 if (paymentAmount.compareTo(outstandingInstallment) > 0) {
@@ -74,16 +114,18 @@ public class WeeklyCollectionService {
                                 .add(paymentAmount);
 
                 String status =
-                        newPaid.compareTo(current.getTotalAmount()) >= 0
+                        newPaid.compareTo(current.getTotalAmount()
+                                .add(current.getPenaltyAmount())) >= 0
                                 ? "PAID"
                                 : "PARTIALLY_PAID";
 
-                payments.save(
+                payments.saveAndReturnId(
                         installmentId,
                         loanId,
                         memberId,
-                        paymentAmount.doubleValue(),
-                        "WEEKLY_COLLECTION"
+                        paymentAmount,
+                        reference,
+                        date
                 );
 
                 installments.updatePayment(
@@ -93,10 +135,6 @@ public class WeeklyCollectionService {
                 );
 
                 // FIX: decrease existing loan outstanding balance
-                var loan = loans.findById(loanId)
-                        .orElseThrow(() ->
-                                new RuntimeException("Loan not found"));
-
                 BigDecimal newLoanOutstanding =
                         loan.getOutstandingDecimal()
                                 .subtract(paymentAmount);
@@ -109,6 +147,9 @@ public class WeeklyCollectionService {
                         loanId,
                         newLoanOutstanding
                 );
+                if (newLoanOutstanding.compareTo(BigDecimal.ZERO) == 0) {
+                    loans.updateStatus(loanId, "COMPLETED");
+                }
 
                 if (savingsAmount != null &&
                         savingsAmount.compareTo(BigDecimal.ZERO) > 0) {
@@ -117,7 +158,7 @@ public class WeeklyCollectionService {
                             memberId,
                             "DEPOSIT",
                             savingsAmount.doubleValue(),
-                            "WEEKLY_COLLECTION"
+                            reference
                     );
                 }
 
@@ -126,7 +167,7 @@ public class WeeklyCollectionService {
                         "INSTALLMENT",
                         installmentId,
                         "SYSTEM",
-                        "Weekly collection posted"
+                        "Collection " + reference + " posted"
                 );
 
                 c.commit();

@@ -153,7 +153,62 @@ public class InstallmentRepository {
 
     public List<Installment> findDueInstallments(int samityId)
             throws SQLException {
+        String sql = """
+                SELECT i.*
+                FROM installments i
+                JOIN loans l ON l.loan_id=i.loan_id
+                JOIN members m ON m.id=l.member_id
+                JOIN group_units g ON g.id=m.group_unit_id
+                WHERE g.samity_id=?
+                  AND i.status IN ('PENDING','PARTIALLY_PAID','OVERDUE')
+                ORDER BY i.due_date, i.installment_number
+                """;
+        List<Installment> result = new ArrayList<>();
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, samityId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) result.add(map(rs));
+            }
+        }
+        return result;
+    }
 
-        return new ArrayList<>();
+    public List<Installment> findOutstanding() throws SQLException {
+        List<Installment> result = new ArrayList<>();
+        try (PreparedStatement ps = connection.prepareStatement("""
+                SELECT * FROM installments
+                WHERE status IN ('PENDING','PARTIALLY_PAID','OVERDUE')
+                ORDER BY due_date, installment_number
+                """); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) result.add(map(rs));
+        }
+        return result;
+    }
+
+    public void updatePenaltyAndStatus(int id, BigDecimal penalty, String status)
+            throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("""
+                UPDATE installments SET penalty_amount=?, status=? WHERE installment_id=?
+                """)) {
+            ps.setBigDecimal(1, penalty);
+            ps.setString(2, status);
+            ps.setInt(3, id);
+            ps.executeUpdate();
+        }
+    }
+
+    private Installment map(ResultSet rs) throws SQLException {
+        Installment item = new Installment();
+        item.setId(rs.getInt("installment_id"));
+        item.setLoanId(rs.getInt("loan_id"));
+        item.setNumber(rs.getInt("installment_number"));
+        item.setDueDate(LocalDate.parse(rs.getString("due_date")));
+        item.setPrincipalAmount(rs.getBigDecimal("principal_amount"));
+        item.setInterestAmount(rs.getBigDecimal("interest_amount"));
+        item.setTotalAmount(rs.getBigDecimal("total_amount"));
+        item.setPenaltyAmount(rs.getBigDecimal("penalty_amount"));
+        item.setPaidAmount(rs.getBigDecimal("paid_amount"));
+        item.setStatus(rs.getString("status"));
+        return item;
     }
 }
