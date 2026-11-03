@@ -6,6 +6,7 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 
+/** Presents and refreshes the dashboard workspace using application services. */
 public class DashboardController {
     private final AppContext context;
     private final Label members = new Label();
@@ -17,12 +18,15 @@ public class DashboardController {
     private final Label overdue = new Label();
     private final Label savings = new Label();
 
-    public DashboardController(AppContext context) { this.context = context; }
+    public DashboardController(AppContext context) {
+        this.context = context;
+    }
 
     public Node view() {
         VBox page = Ui.page("Dashboard");
         GridPane cards = new GridPane();
-        cards.setHgap(25); cards.setVgap(20);
+        cards.setHgap(25);
+        cards.setVgap(20);
         cards.add(card("Total members", members), 0, 0);
         cards.add(card("Active samities", samities), 1, 0);
         cards.add(card("Pending applications", pending), 2, 0);

@@ -6,14 +6,26 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Persists and queries User records using JDBC. */
 public class UserRepository {
     private final Database database;
-    public UserRepository(Database database) { this.database = database; }
+
+    public UserRepository(Database database) {
+        this.database = database;
+    }
 
     public List<User> findAll() {
         List<User> users = new ArrayList<>();
-        try (Connection c = database.connect(); Statement s = c.createStatement(); ResultSet r = s.executeQuery("SELECT * FROM users ORDER BY name")) {
-            while (r.next()) users.add(new User(r.getInt("id"), r.getString("name"), r.getString("role")));
+        try (Connection currentConnection = database.connect();
+                Statement statement = currentConnection.createStatement();
+                ResultSet resultSet = statement.executeQuery("SELECT * FROM users ORDER BY name")) {
+            while (resultSet.next()) {
+                users.add(
+                        new User(
+                                resultSet.getInt("id"),
+                                resultSet.getString("name"),
+                                resultSet.getString("role")));
+            }
             return users;
         } catch (SQLException e) {
             throw new RuntimeException("Could not load users", e);

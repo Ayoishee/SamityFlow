@@ -1,5 +1,6 @@
 package com.samityflow.model;
 
+/** Defines editable product defaults; application agreements use immutable snapshots. */
 public record LoanProduct(
         int id,
         String name,

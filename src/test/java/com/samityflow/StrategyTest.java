@@ -1,8 +1,9 @@
 package com.samityflow;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import com.samityflow.pattern.strategy.*;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class StrategyTest {
     @Test

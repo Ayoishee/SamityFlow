@@ -2,6 +2,7 @@ package com.samityflow.repository;
 
 import java.sql.*;
 
+/** Persists and queries AuditLog records using JDBC. */
 public class AuditLogRepository {
 
     private final Connection connection;
@@ -10,23 +11,25 @@ public class AuditLogRepository {
         this.connection = connection;
     }
 
-    public void save(String action, String entityType,
-                     int entityId, String username,
-                     String details) throws SQLException {
+    public void save(
+            String action, String entityType, int entityId, String username, String details)
+            throws SQLException {
 
-        try (PreparedStatement ps = connection.prepareStatement("""
-            INSERT INTO audit_logs
-            (action, entity_type, entity_id, username, details)
-            VALUES(?,?,?,?,?)
-        """)) {
+        try (PreparedStatement preparedStatement =
+                connection.prepareStatement(
+                        """
+                            INSERT INTO audit_logs
+                            (action, entity_type, entity_id, username, details)
+                            VALUES(?,?,?,?,?)
+                        """)) {
 
-            ps.setString(1, action);
-            ps.setString(2, entityType);
-            ps.setInt(3, entityId);
-            ps.setString(4, username);
-            ps.setString(5, details);
+            preparedStatement.setString(1, action);
+            preparedStatement.setString(2, entityType);
+            preparedStatement.setInt(3, entityId);
+            preparedStatement.setString(4, username);
+            preparedStatement.setString(5, details);
 
-            ps.executeUpdate();
+            preparedStatement.executeUpdate();
         }
     }
 }

@@ -1,9 +1,14 @@
 package com.samityflow.pattern.strategy;
 
+/** Implements the BusinessInterest calculation policy. */
 public class BusinessInterestStrategy implements InterestStrategy {
     @Override
     public double calculate(double principal, double yearlyRatePercent, int durationWeeks) {
-        double weeklyRate = (yearlyRatePercent / 100.0) / 52.0;
-        return principal * weeklyRate * durationWeeks;
+        return java.math.BigDecimal.valueOf(principal)
+                .multiply(java.math.BigDecimal.valueOf(yearlyRatePercent))
+                .movePointLeft(2)
+                .multiply(java.math.BigDecimal.valueOf(durationWeeks))
+                .divide(java.math.BigDecimal.valueOf(52), 12, java.math.RoundingMode.HALF_UP)
+                .doubleValue();
     }
 }

@@ -1,17 +1,17 @@
 package com.samityflow.pattern.schedule;
 
 import com.samityflow.model.Installment;
-
+import com.samityflow.model.LedgerValue;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Generates dated repayment installments with cent-rounded residual allocation. */
 public class StandardWeeklySchedule implements Schedule {
 
     private static final int SCALE = 2;
-
 
     @Override
     public List<Installment> generate(
@@ -19,90 +19,50 @@ public class StandardWeeklySchedule implements Schedule {
             BigDecimal principalAmount,
             BigDecimal interestAmount,
             int installmentCount,
-            LocalDate firstDueDate
-    ) {
+            LocalDate firstDueDate) {
 
         List<Installment> installments = new ArrayList<>();
 
         BigDecimal principalPerInstallment =
-                principalAmount
-                        .divide(
-                                BigDecimal.valueOf(installmentCount),
-                                SCALE,
-                                RoundingMode.HALF_UP
-                        );
-
+                principalAmount.divide(
+                        BigDecimal.valueOf(installmentCount), SCALE, RoundingMode.HALF_UP);
 
         BigDecimal interestPerInstallment =
-                interestAmount
-                        .divide(
-                                BigDecimal.valueOf(installmentCount),
-                                SCALE,
-                                RoundingMode.HALF_UP
-                        );
-
+                interestAmount.divide(
+                        BigDecimal.valueOf(installmentCount), SCALE, RoundingMode.HALF_UP);
 
         BigDecimal principalTotal = BigDecimal.ZERO;
         BigDecimal interestTotal = BigDecimal.ZERO;
 
-
         for (int i = 1; i <= installmentCount; i++) {
-
 
             BigDecimal principal = principalPerInstallment;
             BigDecimal interest = interestPerInstallment;
 
-
             // Last installment absorbs rounding difference
             if (i == installmentCount) {
 
-                principal =
-                        principalAmount.subtract(principalTotal);
+                principal = principalAmount.subtract(principalTotal);
 
-                interest =
-                        interestAmount.subtract(interestTotal);
+                interest = interestAmount.subtract(interestTotal);
             }
 
+            LocalDate dueDate = firstDueDate.plusDays(7L * (i - 1));
 
-            LocalDate dueDate =
-                    firstDueDate.plusDays(
-                            7L * (i - 1)
-                    );
+            Installment installment = new Installment(loanId, i, dueDate, principal, interest);
 
+            installment.setPenaltyAmount(BigDecimal.ZERO);
 
-            Installment installment =
-                    new Installment(
-                            loanId,
-                            i,
-                            dueDate,
-                            principal,
-                            interest
-                    );
+            installment.setPaidAmount(BigDecimal.ZERO);
 
-
-            installment.setPenaltyAmount(
-                    BigDecimal.ZERO
-            );
-
-            installment.setPaidAmount(
-                    BigDecimal.ZERO
-            );
-
-            installment.setStatus(
-                    "PENDING"
-            );
-
+            installment.setStatus(LedgerValue.PENDING);
 
             installments.add(installment);
 
+            principalTotal = principalTotal.add(principal);
 
-            principalTotal =
-                    principalTotal.add(principal);
-
-            interestTotal =
-                    interestTotal.add(interest);
+            interestTotal = interestTotal.add(interest);
         }
-
 
         return installments;
     }

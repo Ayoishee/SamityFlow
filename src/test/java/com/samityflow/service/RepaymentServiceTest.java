@@ -1,11 +1,10 @@
 package com.samityflow.service;
 
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 class RepaymentServiceTest {
 
@@ -32,9 +31,8 @@ class RepaymentServiceTest {
     @Test
     void rejectsInvalidAmountAndDuration() {
         RepaymentService service = new RepaymentService();
-        assertThrows(IllegalArgumentException.class,
-                () -> service.generateWeeklySchedule(1_000, 0));
-        assertThrows(IllegalArgumentException.class,
-                () -> service.generateWeeklySchedule(0, 10));
+        assertThrows(
+                IllegalArgumentException.class, () -> service.generateWeeklySchedule(1_000, 0));
+        assertThrows(IllegalArgumentException.class, () -> service.generateWeeklySchedule(0, 10));
     }
 }

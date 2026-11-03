@@ -8,6 +8,7 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.stage.Stage;
 
+/** Builds the desktop workspace and refreshes screens when switching tabs. */
 public class Main extends Application {
     @Override
     public void start(Stage stage) {
@@ -27,12 +28,27 @@ public class Main extends Application {
         Tab servicingTab = tab("Collection", servicing.view());
         Tab savingsTab = tab("Savings", savings.view());
         Tab reportsTab = tab("Reports", reports.view());
-        TabPane tabs = new TabPane(dashboardTab, managementTab, loanTab, productTab,
-                servicingTab, savingsTab, reportsTab);
-        tabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
-            dashboard.refresh(); management.refresh(); loans.refresh(); products.refresh();
-            servicing.refresh(); savings.refresh(); reports.refresh();
-        });
+        TabPane tabs =
+                new TabPane(
+                        dashboardTab,
+                        managementTab,
+                        loanTab,
+                        productTab,
+                        servicingTab,
+                        savingsTab,
+                        reportsTab);
+        tabs.getSelectionModel()
+                .selectedItemProperty()
+                .addListener(
+                        (obs, oldTab, newTab) -> {
+                            dashboard.refresh();
+                            management.refresh();
+                            loans.refresh();
+                            products.refresh();
+                            servicing.refresh();
+                            savings.refresh();
+                            reports.refresh();
+                        });
 
         stage.setTitle("SamityFlow");
         stage.setScene(new Scene(tabs, 1100, 700));
@@ -45,5 +61,7 @@ public class Main extends Application {
         return tab;
     }
 
-    public static void main(String[] args) { launch(args); }
+    public static void main(String[] args) {
+        launch(args);
+    }
 }

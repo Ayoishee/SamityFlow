@@ -1,8 +1,9 @@
 package com.samityflow;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.samityflow.model.*;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 
 class StateTest {
     @Test

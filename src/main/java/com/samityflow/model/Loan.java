@@ -2,16 +2,16 @@ package com.samityflow.model;
 
 import java.math.BigDecimal;
 
+/** Carries loan principal, outstanding balance and servicing status. */
 public class Loan {
     private int id;
     private int applicationId;
     private int memberId;
     private BigDecimal amount = BigDecimal.ZERO;
     private BigDecimal outstanding = BigDecimal.ZERO;
-    private String status = "PENDING";
+    private String status = LedgerValue.PENDING;
 
-    public Loan() {
-    }
+    public Loan() {}
 
     public Loan(int id, int applicationId, int memberId, double amount) {
         this.id = id;
@@ -33,9 +33,7 @@ public class Loan {
         return memberId;
     }
 
-    /**
-     * Backward-compatible accessor retained for existing UI/service code.
-     */
+    /** Backward-compatible accessor retained for existing UI/service code. */
     public double getAmount() {
         return amount.doubleValue();
     }
@@ -44,9 +42,7 @@ public class Loan {
         return amount;
     }
 
-    /**
-     * Backward-compatible accessor retained for existing UI/service code.
-     */
+    /** Backward-compatible accessor retained for existing UI/service code. */
     public double getOutstanding() {
         return outstanding.doubleValue();
     }

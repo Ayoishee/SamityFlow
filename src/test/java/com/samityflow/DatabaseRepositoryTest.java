@@ -1,5 +1,8 @@
 package com.samityflow;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import com.samityflow.database.Database;
 import com.samityflow.model.LoanApplication;
 import com.samityflow.repository.GroupUnitRepository;
@@ -9,19 +12,14 @@ import com.samityflow.repository.LoanProductRepository;
 import com.samityflow.repository.MemberRepository;
 import com.samityflow.repository.SamityRepository;
 import com.samityflow.repository.UserRepository;
+import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 class DatabaseRepositoryTest {
 
-    @TempDir
-    Path tempDirectory;
+    @TempDir Path tempDirectory;
 
     private Database database;
     private UserRepository userRepository;
@@ -60,16 +58,10 @@ class DatabaseRepositoryTest {
 
     @Test
     void applicationRepositoryCanSaveAndReadAnApplication() {
-        LoanApplication application = applicationRepository.saveNew(
-                1,
-                1,
-                10_000,
-                "Buy seeds"
-        );
+        LoanApplication application = applicationRepository.saveNew(1, 1, 10_000, "Buy seeds");
 
-        LoanApplication savedApplication = applicationRepository
-                .findById(application.getId())
-                .orElseThrow();
+        LoanApplication savedApplication =
+                applicationRepository.findById(application.getId()).orElseThrow();
 
         assertEquals(1, savedApplication.getMemberId());
         assertEquals(1, savedApplication.getProductId());
@@ -79,23 +71,14 @@ class DatabaseRepositoryTest {
 
     @Test
     void databasePreventsDuplicateGuarantees() {
-        LoanApplication application = applicationRepository.saveNew(
-                1,
-                1,
-                10_000,
-                "Buy seeds"
-        );
+        LoanApplication application = applicationRepository.saveNew(1, 1, 10_000, "Buy seeds");
 
         guaranteeRepository.save(application.getId(), 2);
 
-        assertEquals(
-                1,
-                guaranteeRepository.countForApplication(application.getId())
-        );
+        assertEquals(1, guaranteeRepository.countForApplication(application.getId()));
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> guaranteeRepository.save(application.getId(), 2)
-        );
+                () -> guaranteeRepository.save(application.getId(), 2));
     }
 }

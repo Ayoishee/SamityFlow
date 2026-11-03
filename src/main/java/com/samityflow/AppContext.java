@@ -11,6 +11,7 @@ import com.samityflow.service.ReportService;
 import com.samityflow.service.SavingsService;
 import com.samityflow.service.WeeklyCollectionService;
 
+/** Wires repositories and services around one initialized SQLite database. */
 public class AppContext {
     public final Database database;
     public final UserRepository users;

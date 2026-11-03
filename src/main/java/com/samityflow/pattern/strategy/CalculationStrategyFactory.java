@@ -1,7 +1,8 @@
 package com.samityflow.pattern.strategy;
 
+/** Implements the CalculationStrategyFactory calculation policy. */
 public final class CalculationStrategyFactory {
-    private CalculationStrategyFactory() { }
+    private CalculationStrategyFactory() {}
 
     public static InterestStrategy interest(String name) {
         return switch (name) {

@@ -3,6 +3,7 @@ package com.samityflow.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/** Carries fixed principal and interest dues, accrued penalties and cumulative repayments. */
 public class Installment {
 
     private int id;
@@ -18,13 +19,10 @@ public class Installment {
     private BigDecimal penaltyAmount = BigDecimal.ZERO;
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
-    private String status = "PENDING";
-
+    private String status = LedgerValue.PENDING;
 
     // Existing constructor preserved
-    public Installment() {
-    }
-
+    public Installment() {}
 
     // Existing constructor preserved for backward compatibility
     public Installment(int id, int loanId, int number, double amount) {
@@ -34,14 +32,8 @@ public class Installment {
         this.totalAmount = BigDecimal.valueOf(amount);
     }
 
-
     public Installment(
-            int loanId,
-            int number,
-            LocalDate dueDate,
-            BigDecimal principal,
-            BigDecimal interest
-    ) {
+            int loanId, int number, LocalDate dueDate, BigDecimal principal, BigDecimal interest) {
         this.loanId = loanId;
         this.number = number;
         this.dueDate = dueDate;
@@ -49,105 +41,84 @@ public class Installment {
         this.principalAmount = principal;
         this.interestAmount = interest;
 
-        this.totalAmount =
-                principal.add(interest);
+        this.totalAmount = principal.add(interest);
     }
-
 
     public int getId() {
         return id;
     }
 
-
     public void setId(int id) {
         this.id = id;
     }
-
 
     public int getLoanId() {
         return loanId;
     }
 
-
     public void setLoanId(int loanId) {
         this.loanId = loanId;
     }
-
 
     public int getNumber() {
         return number;
     }
 
-
     public void setNumber(int number) {
         this.number = number;
     }
-
 
     public LocalDate getDueDate() {
         return dueDate;
     }
 
-
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
     }
-
 
     public BigDecimal getPrincipalAmount() {
         return principalAmount;
     }
 
-
     public void setPrincipalAmount(BigDecimal principalAmount) {
         this.principalAmount = principalAmount;
     }
-
 
     public BigDecimal getInterestAmount() {
         return interestAmount;
     }
 
-
     public void setInterestAmount(BigDecimal interestAmount) {
         this.interestAmount = interestAmount;
     }
-
 
     public BigDecimal getTotalAmount() {
         return totalAmount;
     }
 
-
     public void setTotalAmount(BigDecimal totalAmount) {
         this.totalAmount = totalAmount;
     }
-
 
     public BigDecimal getPenaltyAmount() {
         return penaltyAmount;
     }
 
-
     public void setPenaltyAmount(BigDecimal penaltyAmount) {
         this.penaltyAmount = penaltyAmount;
     }
-
 
     public BigDecimal getPaidAmount() {
         return paidAmount;
     }
 
-
     public void setPaidAmount(BigDecimal paidAmount) {
         this.paidAmount = paidAmount;
     }
 
-
     public String getStatus() {
         return status;
     }
-
 
     public void setStatus(String status) {
         this.status = status;
@@ -155,8 +126,15 @@ public class Installment {
 
     @Override
     public String toString() {
-        return "Installment #" + number + " - due " + dueDate
-                + " - " + paidAmount.toPlainString() + "/" + totalAmount.toPlainString()
-                + " - " + status;
+        return "Installment #"
+                + number
+                + " - due "
+                + dueDate
+                + " - "
+                + paidAmount.toPlainString()
+                + "/"
+                + totalAmount.toPlainString()
+                + " - "
+                + status;
     }
 }
