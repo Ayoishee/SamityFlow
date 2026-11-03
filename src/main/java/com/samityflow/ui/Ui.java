@@ -5,8 +5,9 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
 
+/** Provides shared JavaFX control and table construction helpers. */
 public final class Ui {
-    private Ui() { }
+    private Ui() {}
 
     public static VBox page(String title) {
         Label heading = new Label(title);
@@ -18,8 +19,11 @@ public final class Ui {
 
     public static void error(Exception exception) {
         String message = exception.getMessage();
-        if (message == null && exception.getCause() != null) message = exception.getCause().getMessage();
-        new Alert(Alert.AlertType.ERROR, message == null ? "Something went wrong" : message).showAndWait();
+        if (message == null && exception.getCause() != null) {
+            message = exception.getCause().getMessage();
+        }
+        new Alert(Alert.AlertType.ERROR, message == null ? "Something went wrong" : message)
+                .showAndWait();
     }
 
     public static void info(String message) {

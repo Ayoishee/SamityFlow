@@ -8,9 +8,9 @@ import com.samityflow.repository.InstallmentRepository;
 import com.samityflow.repository.LoanRepository;
 import com.samityflow.repository.PaymentRepository;
 import com.samityflow.repository.SavingsTransactionRepository;
-
 import java.sql.Connection;
 
+/** Coordinates atomic reversal of payment and explicitly linked savings history. */
 public class PaymentReversalService {
 
     private final Database database;
@@ -23,27 +23,31 @@ public class PaymentReversalService {
         this.database = database;
     }
 
+    /**
+     * Reverses a completed original payment and only its explicitly linked savings deposit in one
+     * owned transaction. Duplicate reversals and spent linked savings throw IllegalStateException;
+     * any failure rolls back ledger, balance, and audit changes.
+     */
     public void reversePayment(int paymentId) {
         try (Connection connection = database.connect()) {
             connection.setAutoCommit(false);
 
             try {
                 PaymentRepository payments = new PaymentRepository(connection);
-                Payment originalPayment = payments
-                        .findById(paymentId)
-                        .orElseThrow(() -> new IllegalStateException("Payment not found"));
+                Payment originalPayment =
+                        payments.findById(paymentId)
+                                .orElseThrow(() -> new IllegalStateException("Payment not found"));
 
-                ReversePaymentCommand command = new ReversePaymentCommand(
-                        originalPayment,
-                        payments,
-                        new InstallmentRepository(connection),
-                        new LoanRepository(connection),
-                        new AuditLogRepository(connection)
-                );
+                ReversePaymentCommand command =
+                        new ReversePaymentCommand(
+                                originalPayment,
+                                payments,
+                                new InstallmentRepository(connection),
+                                new LoanRepository(connection),
+                                new AuditLogRepository(connection));
 
                 command.execute();
-                new SavingsTransactionRepository(connection)
-                        .reverseDeposit(originalPayment.getReference(), paymentId);
+                new SavingsTransactionRepository(connection).reverseDeposit(paymentId);
                 connection.commit();
             } catch (Exception exception) {
                 connection.rollback();

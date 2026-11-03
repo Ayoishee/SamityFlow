@@ -3,8 +3,9 @@ package com.samityflow.pattern.state;
 import com.samityflow.model.ApplicationStatus;
 import com.samityflow.model.LoanApplication;
 
+/** Represents ApplicationStates within the microfinance workflow. */
 public final class ApplicationStates {
-    private ApplicationStates() { }
+    private ApplicationStates() {}
 
     public static ApplicationState forStatus(ApplicationStatus status) {
         return switch (status) {
@@ -18,26 +19,46 @@ public final class ApplicationStates {
     }
 
     private static class DraftState implements ApplicationState {
-        public void submit(LoanApplication a) { a.changeStatus(ApplicationStatus.GUARANTEE_PENDING); }
+        public void submit(LoanApplication a) {
+            a.changeStatus(ApplicationStatus.GUARANTEE_PENDING);
+        }
     }
 
     private static class GuaranteePendingState implements ApplicationState {
-        public void guaranteesCompleted(LoanApplication a) { a.changeStatus(ApplicationStatus.OFFICER_REVIEW); }
-        public void reject(LoanApplication a, String comment) { rejectNow(a, comment); }
+        public void guaranteesCompleted(LoanApplication a) {
+            a.changeStatus(ApplicationStatus.OFFICER_REVIEW);
+        }
+
+        public void reject(LoanApplication a, String comment) {
+            rejectNow(a, comment);
+        }
     }
 
     private static class OfficerReviewState implements ApplicationState {
-        public void officerApprove(LoanApplication a) { a.markOfficerApproved(); a.changeStatus(ApplicationStatus.MANAGER_REVIEW); }
-        public void reject(LoanApplication a, String comment) { rejectNow(a, comment); }
+        public void officerApprove(LoanApplication a) {
+            a.markOfficerApproved();
+            a.changeStatus(ApplicationStatus.MANAGER_REVIEW);
+        }
+
+        public void reject(LoanApplication a, String comment) {
+            rejectNow(a, comment);
+        }
     }
 
     private static class ManagerReviewState implements ApplicationState {
-        public void managerApprove(LoanApplication a, String comment) { a.setManagerComment(comment); a.changeStatus(ApplicationStatus.APPROVED); }
-        public void reject(LoanApplication a, String comment) { rejectNow(a, comment); }
+        public void managerApprove(LoanApplication a, String comment) {
+            a.setManagerComment(comment);
+            a.changeStatus(ApplicationStatus.APPROVED);
+        }
+
+        public void reject(LoanApplication a, String comment) {
+            rejectNow(a, comment);
+        }
     }
 
-    private static class ApprovedState implements ApplicationState { }
-    private static class RejectedState implements ApplicationState { }
+    private static class ApprovedState implements ApplicationState {}
+
+    private static class RejectedState implements ApplicationState {}
 
     private static void rejectNow(LoanApplication a, String comment) {
         a.setManagerComment(comment);

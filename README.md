@@ -149,3 +149,34 @@ SamityFlow is an academic prototype and not a production banking platform. It wi
 ---
 
 *A group-based microfinance application where design patterns represent real approval, repayment, savings, correction, and eligibility rules rather than being added only for pattern count.*
+
+## Development setup
+
+Use JDK 17 or newer (a **complete JDK**, including `javac` and `lib/ct.sym`) and
+Maven 3.9+. Dependencies and JavaFX versions are pinned in `pom.xml`. Linux desktop
+startup requires GTK 3 and an X display. No database server, login credentials,
+or external API is required.
+
+```sh
+mvn verify                    # compile, run all tests, package the JAR
+mvn javafx:run                # launch the desktop application
+mvn spotless:apply            # format all production and test Java sources
+mvn spotless:check            # check formatting without changing files
+```
+
+The formatter is Google Java Format 1.22.0 with the AOSP four-space style, configured
+in Maven. Use braces for all control-flow bodies and blank lines between methods.
+JavaFX is launched through Maven; the plain JAR is not a bundled distribution.
+For automated Linux startup checks, use a virtual display such as
+`xvfb-run -a mvn javafx:run` when Xvfb is installed.
+
+On first launch `AppContext` initializes and migrates `samityflow.db` in the
+**current working directory**, then inserts sample users, a samity, three members,
+and three loan products. Initialization and seeding are repeatable. Start from the
+repository root to consistently use the same local database. The database and
+`target/` build outputs are ignored by Git. Do not delete a real database to fix
+an initialization problem.
+
+See [financial rules and migrations](docs/FINANCIAL_RULES.md) before opening an
+existing database with this version. Back up existing data first. Tests use
+isolated temporary SQLite files and do not require or change your working database.

@@ -1,21 +1,18 @@
 package com.samityflow.pattern.schedule;
 
 import com.samityflow.model.Installment;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+/** Generates dated repayment installments with cent-rounded residual allocation. */
 public class GracePeriodSchedule implements Schedule {
 
-
     private final int graceWeeks;
-
 
     public GracePeriodSchedule(int graceWeeks) {
         this.graceWeeks = graceWeeks;
     }
-
 
     @Override
     public List<Installment> generate(
@@ -23,20 +20,15 @@ public class GracePeriodSchedule implements Schedule {
             BigDecimal principalAmount,
             BigDecimal interestAmount,
             int installmentCount,
-            LocalDate firstDueDate
-    ) {
+            LocalDate firstDueDate) {
 
-
-        StandardWeeklySchedule schedule =
-                new StandardWeeklySchedule();
-
+        StandardWeeklySchedule schedule = new StandardWeeklySchedule();
 
         return schedule.generate(
                 loanId,
                 principalAmount,
                 interestAmount,
                 installmentCount,
-                firstDueDate.plusWeeks(graceWeeks)
-        );
+                firstDueDate.plusWeeks(graceWeeks));
     }
 }

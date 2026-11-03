@@ -1,17 +1,16 @@
 package com.samityflow.repository;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.samityflow.database.Database;
 import com.samityflow.model.GroupUnit;
 import com.samityflow.model.LoanProduct;
 import com.samityflow.model.Member;
 import com.samityflow.model.Samity;
+import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class ManagementCrudTest {
     @TempDir Path temporaryDirectory;
@@ -53,10 +52,11 @@ class ManagementCrudTest {
     @Test
     void loanProductCanBeCreatedUpdatedAndDeleted() {
         LoanProductRepository products = new LoanProductRepository(database);
-        LoanProduct saved = products.save(new LoanProduct(0, "Starter", "BUSINESS", 10,
-                "NORMAL", 2, 10, 1, 50));
-        LoanProduct changed = new LoanProduct(saved.id(), "Starter Plus", "EMERGENCY", 8,
-                "GRACE", 1, 12, 2, 75);
+        LoanProduct saved =
+                products.save(
+                        new LoanProduct(0, "Starter", "BUSINESS", 10, "NORMAL", 2, 10, 1, 50));
+        LoanProduct changed =
+                new LoanProduct(saved.id(), "Starter Plus", "EMERGENCY", 8, "GRACE", 1, 12, 2, 75);
 
         products.update(changed);
         assertEquals(changed, products.findById(saved.id()).orElseThrow());
@@ -66,13 +66,29 @@ class ManagementCrudTest {
 
     @Test
     void invalidManagementInputIsRejected() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> new SamityRepository(database).save("", "Monday"));
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> new GroupUnitRepository(database).save(0, "Group"));
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> new MemberRepository(database).save(1, "Member", ""));
-        assertThrows(IllegalArgumentException.class, () -> new LoanProductRepository(database).save(
-                new LoanProduct(0, "Broken", "BUSINESS", 10, "NORMAL", 2, 0, 1, 50)));
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        new LoanProductRepository(database)
+                                .save(
+                                        new LoanProduct(
+                                                0,
+                                                "Broken",
+                                                "BUSINESS",
+                                                10,
+                                                "NORMAL",
+                                                2,
+                                                0,
+                                                1,
+                                                50)));
     }
 }

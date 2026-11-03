@@ -2,6 +2,7 @@ package com.samityflow.model;
 
 import java.math.BigDecimal;
 
+/** Carries immutable payment history identity and its optional reversal relationship. */
 public class Payment {
     private int id;
     private int loanId;
@@ -12,8 +13,7 @@ public class Payment {
     private String status;
     private Integer reversalOfPaymentId;
 
-    public Payment() {
-    }
+    public Payment() {}
 
     // Existing constructor preserved for backward compatibility.
     public Payment(int id, int loanId, double amount, String reference) {
@@ -31,8 +31,7 @@ public class Payment {
             double amount,
             String reference,
             String status,
-            Integer reversalOfPaymentId
-    ) {
+            Integer reversalOfPaymentId) {
         this.id = id;
         this.loanId = loanId;
         this.installmentId = installmentId;
@@ -75,9 +74,7 @@ public class Payment {
         this.memberId = memberId;
     }
 
-    /**
-     * Backward-compatible numeric accessor used by existing callers.
-     */
+    /** Backward-compatible numeric accessor used by existing callers. */
     public double getAmount() {
         return amount.doubleValue();
     }

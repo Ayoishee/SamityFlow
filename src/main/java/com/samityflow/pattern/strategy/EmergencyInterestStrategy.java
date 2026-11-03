@@ -1,9 +1,12 @@
 package com.samityflow.pattern.strategy;
 
+/** Implements the EmergencyInterest calculation policy. */
 public class EmergencyInterestStrategy implements InterestStrategy {
     @Override
     public double calculate(double principal, double yearlyRatePercent, int durationWeeks) {
-        // Emergency product uses one flat charge, independent of duration.
-        return principal * (yearlyRatePercent / 100.0);
+        return java.math.BigDecimal.valueOf(principal)
+                .multiply(java.math.BigDecimal.valueOf(yearlyRatePercent))
+                .movePointLeft(2)
+                .doubleValue();
     }
 }
